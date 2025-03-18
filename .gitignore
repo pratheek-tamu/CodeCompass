@@ -1,0 +1,4 @@
+data/*
+config.local.yaml
+__pycache__/
+*.pyc

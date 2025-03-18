@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
+  python-networkx-faiss:
+    build: 
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: python-networkx-faiss
+    volumes:
+      - ../src:/app/src
+      - ../data:/app/data
+      - ../scripts:/app/scripts
+      - ../config.yaml:/app/config.yaml
+    working_dir: /app
+    command: python scripts/initial_indexing.py
+
+volumes:
+  mongodb_data:

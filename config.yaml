@@ -1,0 +1,17 @@
+gemini_api:
+  api_key: "YOUR_GEMINI_API_KEY"
+
+mongodb:
+  uri: "mongodb://localhost:27017"
+  database: "code_indexer"
+  metadata_collection: "metadata"
+
+faiss:
+  index_path: "./data/faiss/code_index.faiss"
+  embedding_dimension: 768
+
+graphdb:
+  graph_storage_path: "./data/graphdb/code_graph.pkl"
+
+logging:
+  level: "INFO"
