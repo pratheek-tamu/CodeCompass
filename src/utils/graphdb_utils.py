@@ -1,8 +1,8 @@
 import networkx as nx
 import pickle
 import os
-from utils.logging_utils import setup_logger
-from utils.config_loader import load_config
+from .logging_utils import setup_logger
+from .config_loader import load_config
 
 # Setup Logging
 logger = setup_logger()

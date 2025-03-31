@@ -1,6 +1,7 @@
 from pymongo import MongoClient
-from utils.logging_utils import setup_logger
-from utils.config_loader import load_config
+
+from .logging_utils import setup_logger
+from .config_loader import load_config
 
 # Setup Logging
 logger = setup_logger()
@@ -13,6 +14,14 @@ _collection = _db[_config["metadata_collection"]]
 
 def get_collection():
     return _collection
+
+def get_mongodb_client(uri=None):
+    if uri is None:
+        uri = _config["uri"]
+    return MongoClient(uri, maxPoolSize=50)
+
+def insert_code_file(code_content):
+    return _collection.insert_one(code_content)
 
 def insert_metadata(metadata_list):
     if not isinstance(metadata_list, list):

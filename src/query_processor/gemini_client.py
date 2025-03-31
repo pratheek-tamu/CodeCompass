@@ -8,5 +8,3 @@ class GeminiClient:
     def analyze_query(self, query_text):
         pass
     
-    
-        

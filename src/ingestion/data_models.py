@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, is_dataclass
 from typing import List, Dict, Optional
 
 @dataclass
@@ -64,6 +64,20 @@ class CodeFile:
     function_calls: List[FunctionCall] = field(default_factory=list)
     imports: List[str] = field(default_factory=list)
     global_variables: List[Dict[str, int]] = field(default_factory=list)
+    type: str = "CodeFile.class"
+
+    def to_dict(self):
+        return {
+            "file_path": self.file_path,
+            "entities": [asdict(e) if is_dataclass(e) else e for e in self.entities],
+            "raw_code": self.raw_code,
+            "cleaned_code": self.cleaned_code,
+            "docstrings": self.docstrings,
+            "function_calls": [asdict(fc) if is_dataclass(fc) else fc for fc in self.function_calls], 
+            "imports": self.imports,
+            "global_variables": self.global_variables,
+            "type": self.type
+        }
 
 
 @dataclass
