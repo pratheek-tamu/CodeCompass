@@ -4,16 +4,19 @@ from .doc_parser import parse_doc_file
 from .data_models import CodeFile, IngestedData
 from src.utils.logging_utils import setup_logger, log_info, log_warning
 from src.utils.mongodb_utils import insert_code_file
+from src.indexers.codefile_indexer import CodeBERTIndexer
 
 logger = setup_logger()
 
 class IngestionManager:
-    def __init__(self, root_dir):
+    def __init__(self, root_dir, indexer):
         self.root_dir = root_dir
         self.parsers = {
             ".py": parse_code_file,
             ".md": parse_doc_file
         }
+        self.indexer = indexer
+
 
     def ingest(self):
         """
@@ -35,6 +38,7 @@ class IngestionManager:
                     if isinstance(parsed_data, CodeFile):
                         code_file = parsed_data
                         insert_code_file(code_file.to_dict())
+                        self.indexer.add_code_to_index(code_file.raw_code, code_file.file_path)
                         ingested_data.code_files.append(code_file)
                     elif isinstance(parsed_data, IngestedData.DocumentationFile):
                         ingested_data.documentation_files.append(parsed_data)

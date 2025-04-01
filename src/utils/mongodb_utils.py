@@ -23,6 +23,18 @@ def get_mongodb_client(uri=None):
 def insert_code_file(code_content):
     return _collection.insert_one(code_content)
 
+def fetch_all_raw_code():
+    """Fetch raw_code from all documents of type 'CodeFile.class'."""
+    query = {"type": "CodeFile.class"}
+    projection = {"_id": 0, "file_path": 1, "raw_code": 1}
+    return list(_collection.find(query, projection))
+
+def fetch_raw_code_by_path(file_path):
+    """Fetch raw_code for a specific file_path."""
+    query = {"file_path": file_path, "type": "CodeFile.class"}
+    projection = {"_id": 0, "raw_code": 1}
+    return _collection.find_one(query, projection)
+
 def insert_metadata(metadata_list):
     if not isinstance(metadata_list, list):
         metadata_list = [metadata_list]
