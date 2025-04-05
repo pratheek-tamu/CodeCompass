@@ -1,5 +1,8 @@
 import ast
-from ingestion.data_models import CodeFile, CodeEntity
+from src.utils.logging_utils import setup_logger
+from .data_models import CodeFile, CodeEntity
+
+logger = setup_logger()
 
 def parse_code_file(file_path):
     """
@@ -21,7 +24,14 @@ def parse_code_file(file_path):
             # Extract functions
             if isinstance(node, ast.FunctionDef):
                 docstring = ast.get_docstring(node)
-                decorators = [d.id if isinstance(d, ast.Name) else d.attr for d in node.decorator_list]
+                
+                # Safely extract decorators
+                decorators = [
+                    d.id if isinstance(d, ast.Name) else (d.attr if isinstance(d, ast.Attribute) else None)
+                    for d in node.decorator_list
+                ]
+                decorators = [d for d in decorators if d is not None]  # Remove None values
+                
                 entities.append(CodeEntity(
                     name=node.name,
                     type="function",
@@ -33,19 +43,33 @@ def parse_code_file(file_path):
 
                 # Extract function calls within this function
                 for child in ast.walk(node):
-                    if isinstance(child, ast.Call) and isinstance(child.func, (ast.Name, ast.Attribute)):
-                        callee = child.func.id if isinstance(child.func, ast.Name) else f"{child.func.value.id}.{child.func.attr}"
-                        function_calls.append({
-                            "caller": node.name,
-                            "callee": callee,
-                            "file_path": file_path,
-                            "line_number": child.lineno  # Include line number of call
-                        })
+                    if isinstance(child, ast.Call):  # Ensure `child` is a function call
+                        if isinstance(child.func, ast.Name):
+                            callee = child.func.id
+                        elif isinstance(child.func, ast.Attribute) and isinstance(child.func.value, ast.Name):
+                            callee = f"{child.func.value.id}.{child.func.attr}"
+                        else:
+                            callee = None  # Handle unexpected cases
+
+                        if callee:
+                            function_calls.append({
+                                "caller": node.name,
+                                "callee": callee,
+                                "file_path": file_path,
+                                "line_number": child.lineno
+                            })
 
             # Extract classes
             elif isinstance(node, ast.ClassDef):
                 docstring = ast.get_docstring(node)
-                bases = [base.id if isinstance(base, ast.Name) else base.attr for base in node.bases]
+
+                # Extract base classes safely
+                bases = [
+                    base.id if isinstance(base, ast.Name) else (base.attr if isinstance(base, ast.Attribute) else None)
+                    for base in node.bases
+                ]
+                bases = [b for b in bases if b is not None]  # Remove None values
+
                 entities.append(CodeEntity(
                     name=node.name,
                     type="class",
@@ -68,9 +92,10 @@ def parse_code_file(file_path):
                 global_variables.extend([{"name": target, "line_number": node.lineno} for target in targets])
 
     except (SyntaxError, FileNotFoundError) as e:
-        print(f"Error parsing {file_path}: {e}")
+        logger.error(f"Error parsing {file_path}: {e}")
+        return None
 
-    return CodeFile(
+    codefile = CodeFile(
         file_path=file_path,
         entities=entities,
         raw_code=raw_code,
@@ -80,3 +105,5 @@ def parse_code_file(file_path):
         imports=imports,
         global_variables=global_variables
     )
+    logger.info(f"Parsed {file_path} successfully")
+    return codefile

@@ -1,24 +1,29 @@
-from ingestion.file_crawler import crawl_files
-from ingestion.code_parser import parse_code_file
-from ingestion.doc_parser import parse_doc_file
-from ingestion.data_models import IngestedData
-from utils.logging_utils import setup_logger, log_info, log_warning
+from .file_crawler import crawl_files
+from .code_parser import parse_code_file
+from .doc_parser import parse_doc_file
+from .data_models import CodeFile, IngestedData
+from src.utils.logging_utils import setup_logger, log_info, log_warning
+from src.utils.mongodb_utils import insert_code_file
+from src.indexers.codefile_indexer import CodeBERTIndexer
 
 logger = setup_logger()
 
 class IngestionManager:
-    def __init__(self, root_dir):
+    def __init__(self, root_dir, indexer):
         self.root_dir = root_dir
         self.parsers = {
             ".py": parse_code_file,
             ".md": parse_doc_file
         }
+        self.indexer = indexer
+
 
     def ingest(self):
         """
         Orchestrates the ingestion process by crawling files, parsing them, 
         and returning structured data models.
         """
+        log_info(logger, f"File root: {self.root_dir}")
         files = crawl_files(self.root_dir)
         ingested_data = IngestedData()
 
@@ -30,8 +35,11 @@ class IngestionManager:
 
                 if parser:
                     parsed_data = parser(file)
-                    if isinstance(parsed_data, IngestedData.CodeFile):
-                        ingested_data.code_files.append(parsed_data)
+                    if isinstance(parsed_data, CodeFile):
+                        code_file = parsed_data
+                        insert_code_file(code_file.to_dict())
+                        self.indexer.add_code_to_index(code_file.raw_code, code_file.file_path)
+                        ingested_data.code_files.append(code_file)
                     elif isinstance(parsed_data, IngestedData.DocumentationFile):
                         ingested_data.documentation_files.append(parsed_data)
                 else:
@@ -39,6 +47,6 @@ class IngestionManager:
             except Exception as e:
                 log_warning(logger, f"Failed to parse {file}: {e}")
 
-        log_info(f"Ingested {len(ingested_data.code_files)} code files and "
+        log_info(logger, f"Ingested {len(ingested_data.code_files)} code files and "
                     f"{len(ingested_data.documentation_files)} documentation files.")
         return ingested_data

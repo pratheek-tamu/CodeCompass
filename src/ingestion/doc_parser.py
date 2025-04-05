@@ -1,5 +1,5 @@
 import re
-from ingestion.data_models import DocumentationFile
+from .data_models import DocumentationFile
 
 def preprocess_documentation(raw_content):
     """
