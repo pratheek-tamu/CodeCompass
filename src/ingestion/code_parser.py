@@ -1,6 +1,6 @@
 import ast
 from src.utils.logging_utils import setup_logger
-from .data_models import CodeFile, CodeEntity
+from .data_models import CodeFile, CodeEntity, FunctionCall
 
 logger = setup_logger()
 
@@ -52,12 +52,12 @@ def parse_code_file(file_path):
                             callee = None  # Handle unexpected cases
 
                         if callee:
-                            function_calls.append({
-                                "caller": node.name,
-                                "callee": callee,
-                                "file_path": file_path,
-                                "line_number": child.lineno
-                            })
+                            function_calls.append(FunctionCall(
+                                caller=node.name,
+                                callee=callee,
+                                file_path=file_path,
+                                line_number=child.lineno
+                            ))
 
             # Extract classes
             elif isinstance(node, ast.ClassDef):
