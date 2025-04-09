@@ -9,7 +9,7 @@ class CodeBERTIndexer:
         self.tokenizer = RobertaTokenizer.from_pretrained(model_name)
         self.model = RobertaModel.from_pretrained(model_name)
         self.embedding_dim = embedding_dim
-        self.file_paths = []  # This will store file paths corresponding to FAISS index entries.
+        self.id_count = -1  # This will store file paths corresponding to FAISS index entries.
 
     def encode_code(self, code: str):
         """Encodes code using CodeBERT to produce a vector representation."""
@@ -18,17 +18,15 @@ class CodeBERTIndexer:
             outputs = self.model(**inputs)
         return outputs.last_hidden_state.mean(dim=1).cpu().numpy().flatten()
 
-    def add_code_to_index(self, code: str, file_path: str):
+    def add_code_to_index(self, code: str):
         """Encodes the code and adds its embedding to the FAISS index."""
         embedding = self.encode_code(code)
         add_embeddings_to_index(np.array([embedding]))  # Add to FAISS index
-        self.file_paths.append(file_path)  # Store the corresponding file path
+        self.id_count += 1
+        return self.id_count
 
     def search_similar(self, query_code: str, k=5):
         """Searches for similar code snippets in the FAISS index."""
         query_embedding = self.encode_code(query_code)
         indices, distances = search_similar_vectors(query_embedding, k)
-        
-        # Fetch the file paths corresponding to the indices
-        result_paths = [self.file_paths[i] for i in indices]
-        return result_paths, distances
+        return indices, distances
