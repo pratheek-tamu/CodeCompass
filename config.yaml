@@ -2,7 +2,7 @@ gemini_api:
   api_key: "AIzaSyCsjdpuMZcsfuvlKnMJKb8JWELMwuSov3w"
 
 mongodb:
-  uri: "mongodb://localhost:27017"
+  uri: "mongodb://mongodb:27017"
   database: "code_indexer"
   metadata_collection: "metadata"
 

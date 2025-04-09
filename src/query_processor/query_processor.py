@@ -5,6 +5,13 @@ import logging
 import re
 import requests
 import google.generativeai as genai
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+
+from src.indexers.codefile_indexer import CodeBERTIndexer
+from src.utils.graphdb_utils import get_dependencies, get_dependents, entity_exists
+from src.retrievers.codefile_retriever import fetch_code_file_by_file_path
 
 # Configure logging for debug information
 logging.basicConfig(level=logging.INFO)
@@ -261,6 +268,19 @@ def fallback_reformulated_queries(extracted_data: dict) -> dict:
         "documentation_query": documentation_query
     }
 
+def build_faiss_query_from_graph(node_name):
+    deps = get_dependencies(node_name)  # dependencies
+    users = get_dependents(node_name)   # dependents
+
+    query_parts = [f"Node: {node_name}"]
+
+    if deps:
+        query_parts.append(f"Depends on: {', '.join(deps)}")
+    if users:
+        query_parts.append(f"Used by: {', '.join(users)}")
+
+    return ". ".join(query_parts)
+
 def process_query(query: str) -> dict:
     """
     Full processing pipeline:
@@ -275,8 +295,60 @@ def process_query(query: str) -> dict:
     """
     preprocessed_query = preprocess_query(query)
     extracted_data = get_extraction_from_gemini(preprocessed_query)
-    reformulated_queries = get_reformulated_queries(preprocessed_query, extracted_data)
-    return reformulated_queries
+    if extracted_data['classification']:
+        query_classification = extracted_data['classification']
+        if query_classification == "code-related":
+            print("Call graphdb and faiss db")
+            # use graphdb utils to fetch information from graphdb
+            nodes_to_search = []
+            nodes_to_search.extend(extracted_data['functions'])
+            nodes_to_search.extend(extracted_data['modules'])
+
+            nodes_to_search = list(filter(lambda x: entity_exists(x), nodes_to_search))
+
+            print("Extracted and filtered nodes from User's Initial Query")
+            
+            # use the nodes and extract dependent nodes from graphdb (networkx)
+            faiss_query = dict()
+            for i in nodes_to_search:
+                faiss_query[i] = build_faiss_query_from_graph(i)
+            
+            # print(f"FAISS Query built. {faiss_query}")
+            print(f"FAISS Query built.")
+            
+            # once we have each node with its deps, query faiss to extract code for context
+            indexer = CodeBERTIndexer()
+            context_for_llm = ""
+            for node, query_code in faiss_query.items():
+                result_paths, distances = indexer.search_similar(query_code)
+                # print(f"Results: {result_paths}")
+                codefile = fetch_code_file_by_file_path(result_paths[0])
+                # print(f"Found similar code in the following files: {result_paths}")
+                # print(f"Distances: {distances}")
+                context_for_llm += f"\nNode from User's Query:{node}\n\nRaw Code: {codefile.raw_code}\n\n"
+            
+            print("LLM Context ready.")
+
+            # Using code, generate answer for the original query
+            extraction_prompt = (
+                f"Context: The user has totally seeked information about {len(nodes_to_search)} modules and functions. The below information contains the node of interest from user's query and the raw code of the file it is associated with:\n"
+                f"{context_for_llm}\n\n"
+                f"Based on the above context, answer the user's question in an accurate way.\n"
+            )
+            response = call_gemini_api(extraction_prompt)
+            print("Final Response: ", response)
+
+        elif query_classification == "documentation-related":
+            print("Call FAISS and metadata-db")
+        elif query_classification == "hybrid":
+            print("Call FAISS, graphdb, and metadata db")
+        else:
+            print("Invalid classification")
+    else:
+        print("Error")
+
+    # reformulated_queries = get_reformulated_queries(preprocessed_query, extracted_data)
+    # return reformulated_queries
 
 def main():
     parser = argparse.ArgumentParser(
@@ -286,8 +358,11 @@ def main():
     parser.add_argument("query", type=str, help="Input query string")
     args = parser.parse_args()
     
-    results = process_query(args.query)
-    print(json.dumps(results, indent=4))
+    print(process_query(args.query))
+
+    # old for reformulation
+    # results = process_query(args.query)
+    # print(json.dumps(results, indent=4))
 
 if __name__ == "__main__":
     main()
