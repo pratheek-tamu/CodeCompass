@@ -8,7 +8,7 @@ from src.utils.mongodb_utils import insert_metadata
 from src.utils.graphdb_utils import create_graph, save_graph, get_all_dependencies
 from src.ingestion.ingestion_manager import IngestionManager
 from src.indexers.codefile_indexer import CodeBERTIndexer
-from src.retrievers.codefile_retriever import fetch_raw_code_by_embedding_id
+from src.retrievers.codefile_retriever import fetch_code_file_by_embedding_id
 
 logger = setup_logger()
 config = load_config()
@@ -41,7 +41,7 @@ print(f"dependencies result: {dependencies_result}")
 
 embedding_ids, distances = indexer.search_similar(query_code)
 print(f"Results: {embedding_ids}")
-codefile = fetch_raw_code_by_embedding_id(embedding_ids[0])
-print(f"Found similar code in the following files: {codefile.file_path}")
+codefile = fetch_code_file_by_embedding_id(embedding_ids[0])
+print(f"Found similar code in the following file: {codefile}")
 print(f"Distances: {distances}")
 print(f"Best Similar match code: {codefile.raw_code}")

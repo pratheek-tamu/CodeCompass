@@ -1,6 +1,6 @@
 from typing import List
 from src.ingestion.data_models import CodeFile, CodeEntity, FunctionCall
-from src.utils.mongodb_utils import fetch_raw_code_by_path, fetch_all_raw_code, fetch_raw_code_by_embedding_id
+from src.utils.mongodb_utils import fetch_raw_code_by_path, fetch_all_raw_code, fetch_codefile_doc_by_embedding_id
 from src.utils.logging_utils import log_error
 from dataclasses import asdict
 
@@ -15,7 +15,7 @@ def fetch_code_file_by_file_path(file_path: str) -> CodeFile:
     if not document:
         log_error(f"No document found for file_path: {file_path}")
         return None
-        
+
     entities = [CodeEntity(**entity) for entity in document.get('entities', [])]
     function_calls = [FunctionCall(**fc) for fc in document.get('function_calls', [])]
     
@@ -32,11 +32,11 @@ def fetch_code_file_by_file_path(file_path: str) -> CodeFile:
         type=document.get('type', 'CodeFile.class')
     )
 
-def fetch_code_file_by_file_path(embedding_id: int) -> CodeFile:
+def fetch_code_file_by_embedding_id(embedding_id: int) -> CodeFile:
     """
     Data transfer object (DTO) transformer form DB docs
     """
-    document = fetch_raw_code_by_embedding_id(embedding_id)
+    document = fetch_codefile_doc_by_embedding_id(embedding_id)
     
     if not document:
         log_error(f"No document found for embedding_id: {embedding_id}")
