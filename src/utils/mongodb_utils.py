@@ -35,6 +35,12 @@ def fetch_raw_code_by_path(file_path):
     projection = {"_id": 0, "raw_code": 1}
     return _collection.find_one(query, projection)
 
+def fetch_raw_code_by_embedding_id(embedding_id):
+    """Fetch raw_code for a specific embedding id."""
+    query = {"embedding_id": embedding_id, "type": "CodeFile.class"}
+    projection = {"_id": 0, "raw_code": 1}
+    return _collection.find_one(query, projection)
+
 def insert_metadata(metadata_list):
     if not isinstance(metadata_list, list):
         metadata_list = [metadata_list]

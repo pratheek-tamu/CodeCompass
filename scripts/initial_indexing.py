@@ -8,7 +8,7 @@ from src.utils.mongodb_utils import insert_metadata
 from src.utils.graphdb_utils import create_graph, save_graph, get_all_dependencies
 from src.ingestion.ingestion_manager import IngestionManager
 from src.indexers.codefile_indexer import CodeBERTIndexer
-from src.retrievers.codefile_retriever import fetch_code_file_by_file_path
+from src.retrievers.codefile_retriever import fetch_raw_code_by_embedding_id
 
 logger = setup_logger()
 config = load_config()
@@ -39,9 +39,9 @@ query_code = "class Authorization(github.GithubObject.CompletableGithubObject): 
 dependencies_result = get_all_dependencies()
 print(f"dependencies result: {dependencies_result}")
 
-result_paths, distances = indexer.search_similar(query_code)
-print(f"Results: {result_paths}")
-codefile = fetch_code_file_by_file_path(result_paths[0])
-print(f"Found similar code in the following files: {result_paths}")
+embedding_ids, distances = indexer.search_similar(query_code)
+print(f"Results: {embedding_ids}")
+codefile = fetch_raw_code_by_embedding_id(embedding_ids[0])
+print(f"Found similar code in the following files: {codefile.file_path}")
 print(f"Distances: {distances}")
 print(f"Best Similar match code: {codefile.raw_code}")
