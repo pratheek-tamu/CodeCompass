@@ -56,6 +56,7 @@ class CodeFile:
         imports (List[str]): List of modules imported in this file.
         globals (List[Dict[str, int]]): List of global variables with their line numbers.
     """
+    embedding_id: int
     file_path: str
     entities: List[CodeEntity] = field(default_factory=list)
     raw_code: str = ""
@@ -76,6 +77,7 @@ class CodeFile:
             "function_calls": [asdict(fc) if is_dataclass(fc) else fc for fc in self.function_calls], 
             "imports": self.imports,
             "global_variables": self.global_variables,
+            "embedding_id": self.embedding_id,
             "type": self.type
         }
 

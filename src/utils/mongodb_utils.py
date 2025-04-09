@@ -35,6 +35,45 @@ def fetch_raw_code_by_path(file_path):
     projection = {"_id": 0, "raw_code": 1}
     return _collection.find_one(query, projection)
 
+def fetch_codefile_doc_by_path(file_path):
+    """Fetch raw_code for a specific file_path."""
+    query = {"file_path": file_path, "type": "CodeFile.class"}
+    projection = {
+        "_id": 0,  # Exclude the _id field
+        "file_path": 1,  # Include file_path
+        "raw_code": 1,  # Include raw_code
+        "cleaned_code": 1,  # Include cleaned_code
+        "docstrings": 1,  # Include docstrings
+        "entities": 1,  # Include entities
+        "function_calls": 1,  # Include function_calls
+        "imports": 1,  # Include imports
+        "global_variables": 1,  # Include global_variables
+        "embedding_id": 1,  # Include embedding_id
+        "type": 1,  # Include type
+    }
+    return _collection.find_one(query, projection)
+
+def fetch_codefile_doc_by_embedding_id(embedding_id):
+    """Fetch raw_code and other fields for a specific embedding id."""
+    # Convert embedding_id to a native Python int
+    embedding_id = int(embedding_id)
+    
+    query = {"embedding_id": embedding_id, "type": "CodeFile.class"}
+    projection = {
+        "_id": 0,  # Exclude the _id field
+        "file_path": 1,  # Include file_path
+        "raw_code": 1,  # Include raw_code
+        "cleaned_code": 1,  # Include cleaned_code
+        "docstrings": 1,  # Include docstrings
+        "entities": 1,  # Include entities
+        "function_calls": 1,  # Include function_calls
+        "imports": 1,  # Include imports
+        "global_variables": 1,  # Include global_variables
+        "embedding_id": 1,  # Include embedding_id
+        "type": 1,  # Include type
+    }
+    return _collection.find_one(query, projection)
+
 def insert_metadata(metadata_list):
     if not isinstance(metadata_list, list):
         metadata_list = [metadata_list]
