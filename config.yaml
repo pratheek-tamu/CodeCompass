@@ -1,5 +1,5 @@
 gemini_api:
-  api_key: "YOUR_GEMINI_API_KEY"
+  api_key: "AIzaSyCsjdpuMZcsfuvlKnMJKb8JWELMwuSov3w"
 
 mongodb:
   uri: "mongodb://localhost:27017"
