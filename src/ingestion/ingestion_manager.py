@@ -5,6 +5,7 @@ from .data_models import CodeFile, IngestedData
 from src.utils.logging_utils import setup_logger, log_info, log_warning
 from src.utils.mongodb_utils import insert_code_file
 from src.indexers.codefile_indexer import CodeBERTIndexer
+from src.indexers.graphdb_indexer import add_caller_callee_relations
 
 logger = setup_logger()
 
@@ -39,6 +40,7 @@ class IngestionManager:
                         code_file = parsed_data
                         insert_code_file(code_file.to_dict())
                         self.indexer.add_code_to_index(code_file.raw_code, code_file.file_path)
+                        add_caller_callee_relations(code_file)
                         ingested_data.code_files.append(code_file)
                     elif isinstance(parsed_data, IngestedData.DocumentationFile):
                         ingested_data.documentation_files.append(parsed_data)
