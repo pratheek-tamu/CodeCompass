@@ -25,7 +25,7 @@ logger.info("Created initial NetworkX graph.")
 
 # initialization for dependency creation and injection
 indexer = CodeBERTIndexer()
-repo_path = "data/PyGithub/PyGithub-main/github"
+repo_path = "data/PyGithub/"
 ingestion = IngestionManager(repo_path, indexer)
 
 # code for parasing

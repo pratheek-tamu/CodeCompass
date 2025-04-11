@@ -13,6 +13,7 @@ services:
     build: 
       context: ..
       dockerfile: docker/Dockerfile
+    
     container_name: python-networkx-faiss
     volumes:
       - ../src:/app/src
@@ -20,7 +21,9 @@ services:
       - ../scripts:/app/scripts
       - ../config.yaml:/app/config.yaml
     working_dir: /app
-    command: python scripts/initial_indexing.py
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    # command: python scripts/initial_indexing.py
 
 volumes:
   mongodb_data:

@@ -26,7 +26,19 @@ def insert_code_file(code_content):
 def fetch_all_raw_code():
     """Fetch raw_code from all documents of type 'CodeFile.class'."""
     query = {"type": "CodeFile.class"}
-    projection = {"_id": 0, "file_path": 1, "raw_code": 1}
+    projection = {
+        "_id": 0,  # Exclude the _id field
+        "file_path": 1,  # Include file_path
+        "raw_code": 1,  # Include raw_code
+        "cleaned_code": 1,  # Include cleaned_code
+        "docstrings": 1,  # Include docstrings
+        "entities": 1,  # Include entities
+        "function_calls": 1,  # Include function_calls
+        "imports": 1,  # Include imports
+        "global_variables": 1,  # Include global_variables
+        "embedding_id": 1,  # Include embedding_id
+        "type": 1,  # Include type
+    }
     return list(_collection.find(query, projection))
 
 def fetch_raw_code_by_path(file_path):
