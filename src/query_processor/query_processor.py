@@ -11,7 +11,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.
 
 from src.indexers.codefile_indexer import CodeBERTIndexer
 from src.utils.graphdb_utils import get_dependencies, get_dependents, entity_exists
-from src.retrievers.codefile_retriever import fetch_code_file_by_file_path
+from src.retrievers.codefile_retriever import fetch_code_file_by_embedding_id, fetch_all_code_files
 
 # Configure logging for debug information
 logging.basicConfig(level=logging.INFO)
@@ -89,31 +89,28 @@ def classify_query(query: str) -> str:
     else:
         return "hybrid"
 
-def extract_entity_names(json_file_path="data/code_indexer.metadata.json", useFunction=False):
+def extract_entity_names(code_files):
     """
-    Extracts entities of type 'function' or 'class' from the CodeFile Indexer results
-    or a JSON metadata file, and returns them grouped by type.
+    Extracts entities of type 'function' or 'class' from the CodeFile Indexer results,
+    and returns them grouped by type.
 
     Args:
-        json_file_path (str): The path to the JSON file to parse.
-        useFunction (bool): Whether to use function-based input instead of reading from file.
+        code_files (list): Contains objects to be parsed.
 
     Returns:
         dict: A dictionary with keys as 'function' or 'class', and values as lists of names (str).
     """
     extracted = {"function": [], "class": []}
 
-    if not useFunction:
-        with open(json_file_path, 'r') as file:
-            data = json.load(file)
-
-    for item in data:
-        if "entities" in item and "file_path" in item:
-            for entity in item["entities"]:
-                entity_type = entity.get("type")
-                entity_name = entity.get("name")
-                if entity_type in {"function", "class"} and entity_name:
-                    extracted[entity_type].append(entity_name)
+    for code_file in code_files:
+        file_dict = code_file.to_dict()
+        entities = file_dict.get("entities", [])
+        print(entities)
+        for entity in entities:
+            entity_type = entity.get("type")
+            entity_name = entity.get("name")
+            if entity_type in {"function", "class"} and entity_name:
+                extracted[entity_type].append(entity_name)
 
     return extracted
 
@@ -131,7 +128,7 @@ def get_extraction_from_gemini(query: str) -> dict:
         dict: A dictionary with keys "functions", "modules", and "classification".
     """
     # Get the known entity names from the repository metadata
-    extracted_names = extract_entity_names()
+    extracted_names = extract_entity_names(fetch_all_code_files())
     context_json = json.dumps(extracted_names, indent=2)
 
     extraction_prompt = (
@@ -270,82 +267,70 @@ def fallback_reformulated_queries(extracted_data: dict) -> dict:
 
 def build_faiss_query_from_graph(node_name):
     deps = get_dependencies(node_name)  # dependencies
-    users = get_dependents(node_name)   # dependents
 
     query_parts = [f"Node: {node_name}"]
 
     if deps:
         query_parts.append(f"Depends on: {', '.join(deps)}")
-    if users:
-        query_parts.append(f"Used by: {', '.join(users)}")
 
     return ". ".join(query_parts)
 
-def process_query(query: str) -> dict:
+def process_query(query: str) -> None:
     """
-    Full processing pipeline:
-    1. Preprocess the query.
-    2. Extract entities and classification using Gemini API (with heuristic fallback).
-    3. Reformulate the query for backend systems using Gemini API (with fallback).
-    
-    Args:
-        query (str): The raw input query.
-    Returns:
-        dict: A dictionary with the final reformulated queries.
+    Processes a user query by classifying and extracting relevant code/documentation context,
+    and prints the final LLM response.
     """
     preprocessed_query = preprocess_query(query)
     extracted_data = get_extraction_from_gemini(preprocessed_query)
-    if extracted_data['classification']:
-        query_classification = extracted_data['classification']
-        if query_classification == "code-related":
-            print("Call graphdb and faiss db")
-            # use graphdb utils to fetch information from graphdb
-            nodes_to_search = []
-            nodes_to_search.extend(extracted_data['functions'])
-            nodes_to_search.extend(extracted_data['modules'])
 
-            nodes_to_search = list(filter(lambda x: entity_exists(x), nodes_to_search))
+    classification = extracted_data.get('classification')
+    if not classification:
+        print("Error: Could not classify the query.")
+        return
 
-            print("Extracted and filtered nodes from User's Initial Query")
-            
-            # use the nodes and extract dependent nodes from graphdb (networkx)
-            faiss_query = dict()
-            for i in nodes_to_search:
-                faiss_query[i] = build_faiss_query_from_graph(i)
-            
-            # print(f"FAISS Query built. {faiss_query}")
-            print(f"FAISS Query built.")
-            
-            # once we have each node with its deps, query faiss to extract code for context
-            indexer = CodeBERTIndexer()
-            context_for_llm = ""
-            for node, query_code in faiss_query.items():
-                result_paths, distances = indexer.search_similar(query_code)
-                # print(f"Results: {result_paths}")
-                codefile = fetch_code_file_by_file_path(result_paths[0])
-                # print(f"Found similar code in the following files: {result_paths}")
-                # print(f"Distances: {distances}")
-                context_for_llm += f"\nNode from User's Query:{node}\n\nRaw Code: {codefile.raw_code}\n\n"
-            
-            print("LLM Context ready.")
+    if classification == "code-related":
+        print("Classification: Code-related")
+        
+        # Extract relevant nodes
+        nodes = list(filter(entity_exists, extracted_data.get('functions', []) + extracted_data.get('modules', [])))
+        if not nodes:
+            print("No relevant functions or modules found.")
+            return
 
-            # Using code, generate answer for the original query
-            extraction_prompt = (
-                f"Context: The user has totally seeked information about {len(nodes_to_search)} modules and functions. The below information contains the node of interest from user's query and the raw code of the file it is associated with:\n"
-                f"{context_for_llm}\n\n"
-                f"Based on the above context, answer the user's question in an accurate way.\n"
-            )
-            response = call_gemini_api(extraction_prompt)
-            print("Final Response: ", response)
+        print(f"Nodes identified: {nodes}")
+        faiss_queries = {node: build_faiss_query_from_graph(node) for node in nodes}
 
-        elif query_classification == "documentation-related":
-            print("Call FAISS and metadata-db")
-        elif query_classification == "hybrid":
-            print("Call FAISS, graphdb, and metadata db")
-        else:
-            print("Invalid classification")
+        indexer = CodeBERTIndexer()
+        context_parts = []
+
+        for node, query_code in faiss_queries.items():
+            result_paths, distances = indexer.search_similar(query_code)
+            if len(result_paths) == 0:
+                continue
+            codefile = fetch_code_file_by_embedding_id(result_paths[0])
+            context_parts.append(f"\nNode: {node}\n\nRaw Code:\n{codefile.raw_code}\n")
+
+        if not context_parts:
+            print("No code context retrieved.")
+            return
+
+        llm_context = (
+            f"Context: The user asked about {len(nodes)} nodes. Below is the relevant raw code:\n" +
+            "\n".join(context_parts) +
+            "\n\nBased on this context, answer the user's question accurately."
+        )
+
+        response = call_gemini_api(llm_context)
+        print("Final Response:\n", response)
+
+    elif classification == "documentation-related":
+        print("Classification: Documentation-related (FAISS + Metadata DB placeholder)")
+
+    elif classification == "hybrid":
+        print("Classification: Hybrid (FAISS + GraphDB + Metadata DB placeholder)")
+
     else:
-        print("Error")
+        print("Invalid classification")
 
     # reformulated_queries = get_reformulated_queries(preprocessed_query, extracted_data)
     # return reformulated_queries
@@ -359,10 +344,6 @@ def main():
     args = parser.parse_args()
     
     print(process_query(args.query))
-
-    # old for reformulation
-    # results = process_query(args.query)
-    # print(json.dumps(results, indent=4))
 
 if __name__ == "__main__":
     main()
