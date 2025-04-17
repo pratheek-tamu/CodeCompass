@@ -318,6 +318,7 @@ def process_query(query: str) -> None:
             f"Context: The user asked about {len(nodes)} nodes. Below is the relevant raw code:\n" +
             "\n".join(context_parts) +
             "\n\nBased on this context, answer the user's question accurately."
+            f"\nUser question: {query}"
         )
 
         response = call_gemini_api(llm_context)
