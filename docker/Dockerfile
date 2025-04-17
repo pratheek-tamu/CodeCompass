@@ -14,6 +14,4 @@ ENV PYTHONPATH=/app
 
 WORKDIR /app
 
-CMD ["sh", "scripts/entrypoint.sh"]
-
-# CMD ["python", "scripts/initial_indexing.py"]
+CMD ["python", "scripts/initial_indexing.py"]

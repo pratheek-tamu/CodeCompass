@@ -9,21 +9,38 @@ services:
     volumes:
       - mongodb_data:/data/db
 
-  python-networkx-faiss:
-    build: 
+  initial-indexing:
+    build:
       context: ..
       dockerfile: docker/Dockerfile
-    
-    container_name: python-networkx-faiss
+    container_name: initial-indexing
     volumes:
       - ../src:/app/src
       - ../data:/app/data
       - ../scripts:/app/scripts
       - ../config.yaml:/app/config.yaml
     working_dir: /app
+    command: python scripts/initial_indexing.py
+    depends_on:
+      - mongodb
+    networks:
+      - default
+
+  query-processor:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: query-processor
+    stdin_open: true
+    tty: true
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-    # command: python scripts/initial_indexing.py
+    volumes:
+      - ../src:/app/src
+      - ../data:/app/data
+      - ../config.yaml:/app/config.yaml
+    working_dir: /app
+    command: python src/query_processor/query_processor.py
 
 volumes:
   mongodb_data:
