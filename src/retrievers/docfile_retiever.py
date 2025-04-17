@@ -2,9 +2,6 @@ from typing import List
 from src.ingestion.data_models import DocumentationFile
 from src.utils.mongodb_utils import fetch_document_by_path, fetch_all_documents, fetch_document_doc_by_embedding_id
 from src.utils.logging_utils import log_error
-from dataclasses import asdict, is_dataclass
-
-# Document Retriever
 
 def fetch_document_by_file_path(file_path: str) -> DocumentationFile:
     """
@@ -41,12 +38,12 @@ def fetch_document_by_embedding_id(embedding_id: int) -> DocumentationFile:
         sections=document.get('sections', []),
         raw_content=document.get('raw_content', ''),
         cleaned_content=document.get('cleaned_content'),
-        api_references=document.get('api_references', ''),
+        api_references=document.get('api_references', []),
         embedding_id=document.get('embedding_id'),
         type=document.get('type', 'DocumentationFile.class')
     )
 
-def fetch_all_documents() -> List[DocumentationFile]:
+def fetch_all_documents_from_db() -> List[DocumentationFile]:
     """
     Data transfer object (DTO) transformer from DB docs
     """

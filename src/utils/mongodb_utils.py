@@ -143,6 +143,10 @@ def insert_metadata(metadata_list):
     if not isinstance(metadata_list, list):
         metadata_list = [metadata_list]
 
+    for entry in metadata_list:
+        if not all(k in entry for k in ("function_name", "file_path", "api_reference")):
+            raise ValueError(f"Invalid metadata schema: {entry}")
+
     logger.info(f"Inserting {len(metadata_list)} metadata entries.")
     return _collection.insert_many(metadata_list)
 

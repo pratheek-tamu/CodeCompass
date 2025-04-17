@@ -1,38 +1,38 @@
 import os
-import argparse
 import json
 import logging
 import re
-import requests
-import google.generativeai as genai
 import sys
+import google.generativeai as genai
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-
-from src.indexers.codefile_indexer import CodeBERTIndexer
-from src.utils.graphdb_utils import get_dependencies, get_dependents, entity_exists
+from src.indexers.index_manager import IndexManager
+from src.utils.graphdb_utils import get_dependencies, entity_exists
+from src.utils.embedding_utils import FAISSManager
 from src.retrievers.codefile_retriever import fetch_code_file_by_embedding_id, fetch_all_code_files
 
-# Configure logging for debug information
+# Setup Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Configure Gemini API with your API key from environment variables.
+# Gemini API Configuration
 gemini_api_key = os.environ.get("GEMINI_API_KEY")
 if not gemini_api_key:
     logger.error("GEMINI_API_KEY environment variable is not set!")
     raise ValueError("Missing GEMINI_API_KEY environment variable.")
 genai.configure(api_key=gemini_api_key)
 
+# Initialize IndexManager and FAISSManager
+index_manager = IndexManager()
+code_indexer = index_manager.get_code_indexer()
+faiss_manager = FAISSManager() # Assumes FAISSManager is attached to CodeBERTIndexer
+
 def preprocess_query(query: str) -> str:
     """
     Preprocess the input query by trimming whitespace and removing non-ASCII characters.
     Additional normalization (e.g., lowercasing, spell-check) can be added as needed.
     """
-    query = query.strip()
-    query = query.encode("ascii", errors="ignore").decode()
-    return query
-    
+    return query.strip().encode("ascii", errors="ignore").decode()
+
 def clean_response(response_text: str) -> str:
     """
     Removes markdown code fences (like ```json ... ```) from the response text.
@@ -61,9 +61,7 @@ def call_gemini_api(prompt: str) -> str:
         if not raw_text.strip():
             logger.error("Received empty response from Gemini API for prompt: %s", prompt)
             return None
-        cleaned_text = clean_response(raw_text)
-        logger.info("Cleaned Gemini response: %s", cleaned_text)
-        return cleaned_text
+        return clean_response(raw_text)
     except Exception as e:
         logger.error("Error calling Gemini API: %s", e)
         return None
@@ -81,13 +79,12 @@ def classify_query(query: str) -> str:
     """
     Heuristically classifies the query as 'code', 'documentation', or 'hybrid'.
     """
-    lower_query = query.lower()
-    if "documentation" in lower_query or "doc" in lower_query:
+    q = query.lower()
+    if "documentation" in q or "doc" in q:
         return "documentation"
-    elif "function" in lower_query or "module" in lower_query or "code" in lower_query:
+    elif "function" in q or "module" in q or "code" in q:
         return "code"
-    else:
-        return "hybrid"
+    return "hybrid"
 
 def extract_entity_names(code_files):
     """
@@ -103,15 +100,10 @@ def extract_entity_names(code_files):
     extracted = {"function": [], "class": []}
 
     for code_file in code_files:
-        file_dict = code_file.to_dict()
-        entities = file_dict.get("entities", [])
-        print(entities)
+        entities = code_file.entities
         for entity in entities:
-            entity_type = entity.get("type")
-            entity_name = entity.get("name")
-            if entity_type in {"function", "class"} and entity_name:
-                extracted[entity_type].append(entity_name)
-
+            if entity.type in {"function", "class"} and entity.name:
+                extracted[entity.type].append(entity.name)
     return extracted
 
 def get_extraction_from_gemini(query: str) -> dict:
@@ -132,7 +124,7 @@ def get_extraction_from_gemini(query: str) -> dict:
     context_json = json.dumps(extracted_names, indent=2)
 
     extraction_prompt = (
-        f"Context: Below is a list of known entity names extracted from our code repository:\n"
+        f"Context: Below is a list of known entity names from our code repository:\n"
         f"{context_json}\n\n"
         "Based on this context, process the following query. Extract the following information:\n"
         "- A list of function names mentioned in the query (only include names that are present in the context).\n"
@@ -174,8 +166,8 @@ def get_extraction_from_gemini(query: str) -> dict:
     
     # If the query is code-related or hybrid but no valid entities were found, terminate with an error.
     if not data.get("functions") and not data.get("modules"):
-        logger.error("Invalid query: The query does not reference any known function or class names from our context.")
-        raise SystemExit("Invalid query: The query does not reference any known function or class names from our context.")
+        logger.error("Invalid query: The query does not reference any known function or class names from our context.") 
+        return {}
     
     return data
 
@@ -266,8 +258,7 @@ def fallback_reformulated_queries(extracted_data: dict) -> dict:
     }
 
 def build_faiss_query_from_graph(node_name):
-    deps = get_dependencies(node_name)  # dependencies
-
+    deps = get_dependencies(node_name)
     query_parts = [f"Node: {node_name}"]
 
     if deps:
@@ -280,19 +271,13 @@ def process_query(query: str) -> None:
     Processes a user query by classifying and extracting relevant code/documentation context,
     and prints the final LLM response.
     """
-    preprocessed_query = preprocess_query(query)
-    extracted_data = get_extraction_from_gemini(preprocessed_query)
-
-    classification = extracted_data.get('classification')
-    if not classification:
-        print("Error: Could not classify the query.")
-        return
+    query = preprocess_query(query)
+    extracted_data = get_extraction_from_gemini(query)
+    classification = extracted_data.get("classification")
 
     if classification == "code-related":
         print("Classification: Code-related")
-        
-        # Extract relevant nodes
-        nodes = list(filter(entity_exists, extracted_data.get('functions', []) + extracted_data.get('modules', [])))
+        nodes = list(filter(entity_exists, extracted_data.get("functions", []) + extracted_data.get("modules", [])))
         if not nodes:
             print("No relevant functions or modules found.")
             return
@@ -300,14 +285,15 @@ def process_query(query: str) -> None:
         print(f"Nodes identified: {nodes}")
         faiss_queries = {node: build_faiss_query_from_graph(node) for node in nodes}
 
-        indexer = CodeBERTIndexer()
+
         context_parts = []
 
         for node, query_code in faiss_queries.items():
-            result_paths, distances = indexer.search_similar(query_code)
-            if len(result_paths) == 0:
+            embedding = code_indexer.encode_code(query_code)
+            indices, _ = faiss_manager.search(embedding)
+            if indices is None or len(indices) == 0:
                 continue
-            codefile = fetch_code_file_by_embedding_id(result_paths[0])
+            codefile = fetch_code_file_by_embedding_id(indices[0])
             context_parts.append(f"\nNode: {node}\n\nRaw Code:\n{codefile.raw_code}\n")
 
         if not context_parts:
@@ -333,18 +319,20 @@ def process_query(query: str) -> None:
     else:
         print("Invalid classification")
 
-    # reformulated_queries = get_reformulated_queries(preprocessed_query, extracted_data)
-    # return reformulated_queries
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="Robust CLI-based Query Processor Module"
-    )
-
-    parser.add_argument("query", type=str, help="Input query string")
-    args = parser.parse_args()
-    
-    print(process_query(args.query))
+def interactive_query_loop():
+    print("Welcome to CodeCompass Query System! Type your query below, or type 'exit' to quit.")
+    while True:
+        try:
+            query = input("\n> ").strip()
+            if query.lower() in {"exit", "quit"}:
+                print("Exiting. Thank you!")
+                break
+            process_query(query)
+        except KeyboardInterrupt:
+            print("\nExiting.")
+            break
+        except Exception as e:
+            print(f"Error: {e}")
 
 if __name__ == "__main__":
-    main()
+    interactive_query_loop()

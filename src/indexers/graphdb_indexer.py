@@ -22,7 +22,11 @@ def add_caller_callee_relations(code_file):
         graph.nodes[callee]["file_path"] = function_call.file_path
         
         # Add dependency (caller → callee)
-        graph.add_edge(caller, callee, line_number=function_call.line_number)
+        if graph.has_edge(caller, callee):
+            graph[caller][callee].setdefault("line_numbers", []).append(function_call.line_number)
+        else:
+            graph.add_edge(caller, callee, line_numbers=[function_call.line_number])
+
 
     save_graph(graph)
     log_info(logger, f"Updated GraphDB with caller-callee relationships from {code_file.file_path}.")
