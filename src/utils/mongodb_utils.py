@@ -26,19 +26,7 @@ def insert_code_file(code_content):
 def fetch_all_raw_code():
     """Fetch raw_code from all documents of type 'CodeFile.class'."""
     query = {"type": "CodeFile.class"}
-    projection = {
-        "_id": 0,  # Exclude the _id field
-        "file_path": 1,  # Include file_path
-        "raw_code": 1,  # Include raw_code
-        "cleaned_code": 1,  # Include cleaned_code
-        "docstrings": 1,  # Include docstrings
-        "entities": 1,  # Include entities
-        "function_calls": 1,  # Include function_calls
-        "imports": 1,  # Include imports
-        "global_variables": 1,  # Include global_variables
-        "embedding_id": 1,  # Include embedding_id
-        "type": 1,  # Include type
-    }
+    projection = {"_id": 0, "file_path": 1, "raw_code": 1}
     return list(_collection.find(query, projection))
 
 def fetch_raw_code_by_path(file_path):
@@ -83,6 +71,59 @@ def fetch_codefile_doc_by_embedding_id(embedding_id):
         "global_variables": 1,  # Include global_variables
         "embedding_id": 1,  # Include embedding_id
         "type": 1,  # Include type
+    }
+    return _collection.find_one(query, projection)
+
+# Document Operations (new additions)
+def insert_document_file(document_content):
+    """Insert a document file into the collection."""
+    return _collection.insert_one(document_content)
+
+def fetch_all_documents():
+    """Fetch all documents of type 'DocumentationFile.class'."""
+    query = {"type": "DocumentationFile.class"}
+    projection = {
+        "_id": 0,
+        "file_path": 1,
+        "sections": 1,
+        "raw_content": 1,
+        "cleaned_content": 1,
+        "api_references": 1,
+        "embedding_id": 1,
+        "type": 1
+    }
+    return list(_collection.find(query, projection))
+
+def fetch_document_by_path(file_path):
+    """Fetch document data for a specific file_path."""
+    query = {"file_path": file_path, "type": "DocumentationFile.class"}
+    projection = {
+        "_id": 0,
+        "file_path": 1,
+        "sections": 1,
+        "raw_content": 1,
+        "cleaned_content": 1,
+        "api_references": 1,
+        "embedding_id": 1,
+        "type": 1
+    }
+    return _collection.find_one(query, projection)
+
+def fetch_document_doc_by_embedding_id(embedding_id):
+    """Fetch document for a specific embedding id."""
+    # Convert embedding_id to a native Python int
+    embedding_id = int(embedding_id)
+    
+    query = {"embedding_id": embedding_id, "type": "DocumentationFile.class"}
+    projection = {
+        "_id": 0,
+        "file_path": 1,
+        "sections": 1,
+        "raw_content": 1,
+        "cleaned_content": 1,
+        "api_references": 1,
+        "embedding_id": 1,
+        "type": 1
     }
     return _collection.find_one(query, projection)
 

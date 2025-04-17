@@ -1,10 +1,11 @@
 from .file_crawler import crawl_files
 from .code_parser import parse_code_file
 from .doc_parser import parse_doc_file
-from .data_models import CodeFile, IngestedData
+from .data_models import CodeFile, IngestedData, DocumentationFile
 from src.utils.logging_utils import setup_logger, log_info, log_warning
-from src.utils.mongodb_utils import insert_code_file
+from src.utils.mongodb_utils import insert_code_file, insert_document_file
 from src.indexers.codefile_indexer import CodeBERTIndexer
+from src.indexers.metadata_indexer import DocumentIndexer
 from src.indexers.graphdb_indexer import add_caller_callee_relations
 
 logger = setup_logger()
@@ -43,8 +44,14 @@ class IngestionManager:
                         insert_code_file(code_file.to_dict())
                         add_caller_callee_relations(code_file)
                         ingested_data.code_files.append(code_file)
-                    elif isinstance(parsed_data, IngestedData.DocumentationFile):
-                        ingested_data.documentation_files.append(parsed_data)
+                    # elif isinstance(parsed_data, IngestedData.DocumentationFile):
+                    #     ingested_data.documentation_files.append(parsed_data)
+                    elif isinstance(parsed_data, DocumentationFile):
+                        doc_file = parsed_data
+                        embedding_id = self.indexer.add_document_to_index(doc_file.raw_content)
+                        doc_file.embedding_id = embedding_id
+                        insert_document_file(doc_file.to_dict())
+                        ingested_data.documentation_files.append(doc_file)
                 else:
                     log_warning(logger, f"No parser registered for file type: {file}")
             except Exception as e:
