@@ -201,11 +201,13 @@ def get_context_for_code(nodes):
     for node, query_code in faiss_queries.items():
         embedding = code_indexer.encode_code(query_code)
         indices, _ = faiss_manager.search(embedding)
+        print(indices, type(indices))
         if indices is None or len(indices) == 0:
             continue
         codefile = fetch_code_file_by_embedding_id(indices[0])
+        print(codefile.file_path)
+        print(codefile.raw_code)
         context_parts.append(f"\nNode: {node}\n\nRaw Code:\n{codefile.raw_code}\n")
-    print(codefile.file_path)
     if not context_parts:
         print("No code context retrieved.")
         return
@@ -240,7 +242,7 @@ def extract_documentation_related_response(query):
     return response
 
 def extract_code_related_response(nodes, query):
-    code_context = get_context_for_code2(nodes)
+    code_context = get_context_for_code(nodes)
     document_context = get_context_for_document(query)  
 
     llm_context = (
