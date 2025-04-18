@@ -10,6 +10,9 @@ class CodeBERTIndexer:
         self.embedding_dim = embedding_dim
         self.id_count = -1  # This will store file paths corresponding to FAISS index entries.
 
+    def set_index_value(self, updated_id_count: int):
+        self.id_count = updated_id_count
+
     def encode_code(self, code: str):
         """Encodes code using CodeBERT to produce a vector representation."""
         inputs = self.tokenizer(code, return_tensors="pt", truncation=True, padding=True, max_length=512)
@@ -55,4 +58,5 @@ class CodeBERTIndexer:
             faiss_manager.add_embeddings(np.array([embedding]))  # Add to FAISS index
             self.id_count += 1
             embedding_ids.append(self.id_count)
-        return embedding_ids
+        print("id_count: ", self.id_count)
+        return embedding_ids, self.id_count

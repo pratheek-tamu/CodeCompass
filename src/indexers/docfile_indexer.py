@@ -10,6 +10,9 @@ class DocumentIndexer:
         self.embedding_dim = embedding_dim
         self.id_count = -1  # Store document IDs corresponding to FAISS index entries
 
+    def set_index_value(self, updated_id_count: int):
+        self.id_count = updated_id_count
+
     def encode_document(self, document: str):
         """Encodes document text to produce a vector representation."""
         inputs = self.tokenizer(document, return_tensors="pt", truncation=True, padding=True, max_length=512)
@@ -22,4 +25,4 @@ class DocumentIndexer:
         embedding = self.encode_document(document)
         faiss_manager.add_embeddings(np.array([embedding]))  # Add to FAISS index
         self.id_count += 1
-        return self.id_count
+        return self.id_count 

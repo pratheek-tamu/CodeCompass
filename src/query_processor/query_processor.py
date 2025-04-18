@@ -240,7 +240,7 @@ def extract_documentation_related_response(query):
     return response
 
 def extract_code_related_response(nodes, query):
-    code_context = get_context_for_code2(nodes)
+    code_context = get_context_for_code(nodes)
     document_context = get_context_for_document(query)  
 
     llm_context = (

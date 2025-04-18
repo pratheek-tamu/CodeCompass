@@ -47,7 +47,8 @@ class IngestionManager:
                     parsed_data = parser(file)
                     if isinstance(parsed_data, CodeFile):
                         code_file = parsed_data
-                        embedding_ids = self.code_indexer.add_code_to_index_by_chunks(code_file.raw_code, self.faiss_manager)
+                        embedding_ids, id_count = self.code_indexer.add_code_to_index_by_chunks(code_file.raw_code, self.faiss_manager)
+                        self.doc_indexer.set_index_value(id_count)
                         code_file.embedding_ids = embedding_ids
                         insert_code_file(code_file.to_dict())
                         add_caller_callee_relations(code_file)
@@ -55,6 +56,7 @@ class IngestionManager:
                     elif isinstance(parsed_data, DocumentationFile):
                         doc_file = parsed_data
                         embedding_id = self.doc_indexer.add_document_to_index(doc_file.raw_content, self.faiss_manager)
+                        self.code_indexer.set_index_value(embedding_id)
                         doc_file.embedding_id = embedding_id
                         insert_document_file(doc_file.to_dict())
                         ingested_data.documentation_files.append(doc_file)
