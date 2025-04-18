@@ -56,6 +56,7 @@ class CodeBERTIndexer:
         embedding_ids = []
         for embedding in embeddings:
             faiss_manager.add_embeddings(np.array([embedding]))  # Add to FAISS index
+            print("Debugging", self.id_count)
             self.id_count += 1
             embedding_ids.append(self.id_count)
         print("id_count: ", self.id_count)
