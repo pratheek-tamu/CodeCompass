@@ -2,7 +2,7 @@ gemini_api:
   api_key: "YOUR_GEMINI_API_KEY"
 
 mongodb:
-  uri: "mongodb://localhost:27017"
+  uri: "mongodb://mongodb:27017"
   database: "code_indexer"
   metadata_collection: "metadata"
 

@@ -55,8 +55,9 @@ class CodeFile:
         function_calls (List[FunctionCall]): List of function call relationships within the file.
         imports (List[str]): List of modules imported in this file.
         globals (List[Dict[str, int]]): List of global variables with their line numbers.
+        embedding_ids (List[int]): List of embedding id.
     """
-    embedding_id: int
+    embedding_ids: List[int]
     file_path: str
     entities: List[CodeEntity] = field(default_factory=list)
     raw_code: str = ""
@@ -77,10 +78,27 @@ class CodeFile:
             "function_calls": [asdict(fc) if is_dataclass(fc) else fc for fc in self.function_calls], 
             "imports": self.imports,
             "global_variables": self.global_variables,
-            "embedding_id": self.embedding_id,
+            "embedding_ids": self.embedding_ids,
             "type": self.type
         }
 
+
+# @dataclass
+# class DocumentationFile:
+#     """
+#     Represents a documentation file with its sections and raw content.
+    
+#     Attributes:
+#         file_path (str): Path to the documentation file (.md).
+#         sections (List[str]): List of section headers found in the documentation.
+#         raw_content (str): Raw content of the documentation file.
+#         cleaned_content (Optional[str]): Preprocessed content of the documentation file.
+#     """
+#     file_path: str
+#     sections: List[str] = field(default_factory=list)
+#     raw_content: str = ""
+#     cleaned_content: Optional[str] = None
+#     api_references: str = ""
 
 @dataclass
 class DocumentationFile:
@@ -92,12 +110,26 @@ class DocumentationFile:
         sections (List[str]): List of section headers found in the documentation.
         raw_content (str): Raw content of the documentation file.
         cleaned_content (Optional[str]): Preprocessed content of the documentation file.
+        embedding_id (int): ID for retrieving the document's embedding from vector database.
     """
     file_path: str
     sections: List[str] = field(default_factory=list)
     raw_content: str = ""
     cleaned_content: Optional[str] = None
     api_references: str = ""
+    embedding_id: int = -1
+    type: str = "DocumentationFile.class"
+    
+    def to_dict(self):
+        return {
+            "file_path": self.file_path,
+            "sections": self.sections,
+            "raw_content": self.raw_content,
+            "cleaned_content": self.cleaned_content,
+            "api_references": self.api_references,
+            "embedding_id": self.embedding_id,
+            "type": self.type
+        }
 
 
 @dataclass

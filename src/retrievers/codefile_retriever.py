@@ -2,9 +2,6 @@ from typing import List
 from src.ingestion.data_models import CodeFile, CodeEntity, FunctionCall
 from src.utils.mongodb_utils import fetch_raw_code_by_path, fetch_all_raw_code, fetch_codefile_doc_by_embedding_id
 from src.utils.logging_utils import log_error
-from dataclasses import asdict
-
-# Assuming your MongoDB setup and logging is already done
 
 def fetch_code_file_by_file_path(file_path: str) -> CodeFile:
     """
@@ -28,13 +25,13 @@ def fetch_code_file_by_file_path(file_path: str) -> CodeFile:
         function_calls=function_calls,
         imports=document.get('imports', []),
         global_variables=document.get('global_variables', []),
-        embedding_id=document.get('embedding_id'),
+        embedding_ids=document.get('embedding_ids', []),
         type=document.get('type', 'CodeFile.class')
     )
 
 def fetch_code_file_by_embedding_id(embedding_id: int) -> CodeFile:
     """
-    Data transfer object (DTO) transformer form DB docs
+    Data transfer object (DTO) transformer from DB docs
     """
     document = fetch_codefile_doc_by_embedding_id(embedding_id)
     
@@ -54,7 +51,7 @@ def fetch_code_file_by_embedding_id(embedding_id: int) -> CodeFile:
         function_calls=function_calls,
         imports=document.get('imports', []),
         global_variables=document.get('global_variables', []),
-        embedding_id=document.get('embedding_id'),
+        embedding_ids=document.get('embedding_ids', []),
         type=document.get('type', 'CodeFile.class')
     )
 
@@ -78,7 +75,7 @@ def fetch_all_code_files() -> List[CodeFile]:
             function_calls=function_calls,
             imports=document.get('imports', []),
             global_variables=document.get('global_variables', []),
-            embedding_id=document.get('embedding_id'),
+            embedding_ids=document.get('embedding_ids', []),
             type=document.get('type', 'CodeFile.class')
         ))
     

@@ -18,7 +18,7 @@ def get_function_file(function_name):
 def get_call_line_number(caller, callee):
     graph = _get_graph()
     if graph.has_edge(caller, callee):
-        return graph[caller][callee].get("line_number", None)
+        return graph[caller][callee].get("line_number", [])
     return None
 
 def get_all_functions():
