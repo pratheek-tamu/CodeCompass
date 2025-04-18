@@ -38,8 +38,8 @@ class IngestionManager:
                     parsed_data = parser(file)
                     if isinstance(parsed_data, CodeFile):
                         code_file = parsed_data
-                        embedding_id = self.indexer.add_code_to_index(code_file.raw_code)
-                        code_file.embedding_id = embedding_id
+                        embedding_ids = self.indexer.add_code_to_index_by_chunks(code_file.raw_code)
+                        code_file.embedding_ids = embedding_ids
                         insert_code_file(code_file.to_dict())
                         add_caller_callee_relations(code_file)
                         ingested_data.code_files.append(code_file)
