@@ -8,6 +8,16 @@ def add_caller_callee_relations(code_file):
     Takes a single CodeFile object and updates the graph with caller-callee relationships.
     """
     graph = _get_graph()
+
+    for entity in code_file.entities:
+        if not graph.has_node(entity.name):
+            graph.add_node(entity.name,
+                           type=entity.type,
+                           file_path=entity.file_path,
+                           line_number=entity.line_number,
+                           docstring=entity.docstring,
+                           decorators=entity.decorators,
+                           parents=entity.parents)
     
     for function_call in code_file.function_calls:
         caller = function_call.caller
