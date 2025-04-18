@@ -10,6 +10,40 @@ class CodeBERTIndexer:
         self.model = RobertaModel.from_pretrained(model_name)
         self.embedding_dim = embedding_dim
         self.id_count = -1  # This will store file paths corresponding to FAISS index entries.
+    
+    def encode_code_by_chunks(self, code: str, chunk_size=512):
+        """Encodes code in chunks to get multiple embeddings per file."""
+        tokens = self.tokenizer.tokenize(code)
+        chunks = [tokens[i:i + chunk_size] for i in range(0, len(tokens), chunk_size)]
+
+        embeddings = []
+        for chunk in chunks:
+            inputs = self.tokenizer(
+                chunk,
+                return_tensors="pt",
+                truncation=True,
+                padding=True,
+                max_length=512,
+                is_split_into_words=True,
+            )
+
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+                chunk_embedding = outputs.last_hidden_state.mean(dim=1)
+                embeddings.append(chunk_embedding.squeeze(0).cpu().numpy())
+
+        return embeddings  # List[np.ndarray] each of shape (768,)
+    
+    def add_code_to_index_by_chunks(self, code: str):
+        """Encodes the code and adds its embedding to the FAISS index."""
+        embeddings = self.encode_code_by_chunks(code)
+        embedding_ids = []
+        for embedding in embeddings:
+            add_embeddings_to_index(np.array([embedding]))  # Add to FAISS index
+            self.id_count += 1
+            embedding_ids.append(self.id_count)
+        print("embedding_ids are: ", embedding_ids)
+        return embedding_ids
 
     def encode_code(self, code: str):
         """Encodes code using CodeBERT to produce a vector representation."""
