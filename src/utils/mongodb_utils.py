@@ -36,7 +36,7 @@ def fetch_all_raw_code():
         "function_calls": 1,  # Include function_calls
         "imports": 1,  # Include imports
         "global_variables": 1,  # Include global_variables
-        "embedding_id": 1,  # Include embedding_id
+        "embedding_ids": 1,  # Include embedding_ids
         "type": 1,  # Include type
     }
     return list(_collection.find(query, projection))
@@ -60,7 +60,7 @@ def fetch_codefile_doc_by_path(file_path):
         "function_calls": 1,  # Include function_calls
         "imports": 1,  # Include imports
         "global_variables": 1,  # Include global_variables
-        "embedding_id": 1,  # Include embedding_id
+        "embedding_ids": 1,  # Include embedding_ids
         "type": 1,  # Include type
     }
     return _collection.find_one(query, projection)
@@ -70,7 +70,7 @@ def fetch_codefile_doc_by_embedding_id(embedding_id):
     # Convert embedding_id to a native Python int
     embedding_id = int(embedding_id)
     
-    query = {"embedding_id": embedding_id, "type": "CodeFile.class"}
+    query = {"embedding_ids": embedding_id, "type": "CodeFile.class"}
     projection = {
         "_id": 0,  # Exclude the _id field
         "file_path": 1,  # Include file_path
@@ -81,7 +81,7 @@ def fetch_codefile_doc_by_embedding_id(embedding_id):
         "function_calls": 1,  # Include function_calls
         "imports": 1,  # Include imports
         "global_variables": 1,  # Include global_variables
-        "embedding_id": 1,  # Include embedding_id
+        "embedding_ids": 1,  # Include embedding_ids
         "type": 1,  # Include type
     }
     return _collection.find_one(query, projection)
@@ -101,7 +101,7 @@ def fetch_all_documents():
         "raw_content": 1,
         "cleaned_content": 1,
         "api_references": 1,
-        "embedding_id": 1,
+        "embedding_ids": 1,
         "type": 1
     }
     return list(_collection.find(query, projection))
@@ -116,7 +116,7 @@ def fetch_document_by_path(file_path):
         "raw_content": 1,
         "cleaned_content": 1,
         "api_references": 1,
-        "embedding_id": 1,
+        "embedding_ids": 1,
         "type": 1
     }
     return _collection.find_one(query, projection)
@@ -134,7 +134,7 @@ def fetch_document_doc_by_embedding_id(embedding_id):
         "raw_content": 1,
         "cleaned_content": 1,
         "api_references": 1,
-        "embedding_id": 1,
+        "embedding_ids": 1,
         "type": 1
     }
     return _collection.find_one(query, projection)

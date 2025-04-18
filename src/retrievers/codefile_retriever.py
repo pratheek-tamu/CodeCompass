@@ -25,7 +25,7 @@ def fetch_code_file_by_file_path(file_path: str) -> CodeFile:
         function_calls=function_calls,
         imports=document.get('imports', []),
         global_variables=document.get('global_variables', []),
-        embedding_id=document.get('embedding_id'),
+        embedding_ids=document.get('embedding_ids', []),
         type=document.get('type', 'CodeFile.class')
     )
 
@@ -51,7 +51,7 @@ def fetch_code_file_by_embedding_id(embedding_id: int) -> CodeFile:
         function_calls=function_calls,
         imports=document.get('imports', []),
         global_variables=document.get('global_variables', []),
-        embedding_id=document.get('embedding_id'),
+        embedding_ids=document.get('embedding_ids', []),
         type=document.get('type', 'CodeFile.class')
     )
 
@@ -75,7 +75,7 @@ def fetch_all_code_files() -> List[CodeFile]:
             function_calls=function_calls,
             imports=document.get('imports', []),
             global_variables=document.get('global_variables', []),
-            embedding_id=document.get('embedding_id'),
+            embedding_ids=document.get('embedding_ids', []),
             type=document.get('type', 'CodeFile.class')
         ))
     
