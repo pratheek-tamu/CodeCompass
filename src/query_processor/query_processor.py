@@ -9,6 +9,7 @@ from src.indexers.index_manager import IndexManager
 from src.utils.graphdb_utils import get_dependencies, entity_exists
 from src.utils.embedding_utils import FAISSManager
 from src.retrievers.codefile_retriever import fetch_code_file_by_embedding_id, fetch_all_code_files
+from src.retrievers.docfile_retiever import fetch_document_by_embedding_id
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -24,6 +25,7 @@ genai.configure(api_key=gemini_api_key)
 # Initialize IndexManager and FAISSManager
 index_manager = IndexManager()
 code_indexer = index_manager.get_code_indexer()
+doc_indexer = index_manager.get_doc_indexer()
 faiss_manager = FAISSManager() # Assumes FAISSManager is attached to CodeBERTIndexer
 
 def preprocess_query(query: str) -> str:
@@ -77,14 +79,14 @@ def extract_entities_heuristic(query: str):
 
 def classify_query(query: str) -> str:
     """
-    Heuristically classifies the query as 'code', 'documentation', or 'hybrid'.
+    Heuristically classifies the query as 'code', or 'documentation'.
     """
     q = query.lower()
     if "documentation" in q or "doc" in q:
         return "documentation"
     elif "function" in q or "module" in q or "code" in q:
         return "code"
-    return "hybrid"
+    return "Invalid"
 
 def extract_entity_names(code_files):
     """
@@ -124,19 +126,27 @@ def get_extraction_from_gemini(query: str) -> dict:
     context_json = json.dumps(extracted_names, indent=2)
 
     extraction_prompt = (
-        f"Context: Below is a list of known entity names from our code repository:\n"
+        "You are an assistant that classifies developer queries and extracts mentioned entities.\n\n"
+        "You are given:\n"
+        "- A context of known function and class names from a codebase (see below).\n"
+        "- A user query that may refer to code, documentation, or both.\n\n"
+        "Code Context:\n"
         f"{context_json}\n\n"
-        "Based on this context, process the following query. Extract the following information:\n"
-        "- A list of function names mentioned in the query (only include names that are present in the context).\n"
-        "- A list of class or module names mentioned in the query (only include names that are present in the context).\n"
-        "- Classification: Indicate whether the query is code-related, documentation-related, or hybrid.\n\n"
-        "Important: All valid function and class names are provided in the context above. Do not hallucinate "
-        "or include any names that are not in the context. If the query mentions an entity not present in the context, "
-        "do not include it in the output.\n\n"
-        f"Query: \"{query}\"\n"
-        "Respond in valid JSON format with double quotes for keys and values. "
-        "The JSON should have keys: \"functions\", \"modules\", and \"classification\"."
+        "User Query:\n"
+        f"\"{query}\"\n\n"
+        "Your tasks:\n"
+        "1. From the context, extract which function names are mentioned in the query.\n"
+        "2. From the context, extract which class/module names are mentioned in the query.\n"
+        "3. Classify the query as one of the following:\n"
+        "   - \"code-related\" → focuses on implementation, debugging, performance, or how code works. Queries that are a mix of Code structure + Doc explanation can also be classified in this category\n"
+        "   - \"documentation-related\" → focuses on usage, purpose, description, or explanations from docs.\n"
+        "Important rules:\n"
+        "- Do NOT invent names. Only use names from the Code Context.\n"
+        "- Use \"code-related\" **if both code and documentation are relevant** in the query.\n"
+        "- Return a valid JSON object with keys: \"functions\", \"modules\", and \"classification\".\n"
+        "- Double quotes must be used in JSON keys and string values.\n\n"
     )
+
 
     response = call_gemini_api(extraction_prompt)
     if response is None:
@@ -164,107 +174,96 @@ def get_extraction_from_gemini(query: str) -> dict:
         classification = classify_query(query)
         return {"functions": functions, "modules": modules, "classification": classification}
     
-    # If the query is code-related or hybrid but no valid entities were found, terminate with an error.
-    if not data.get("functions") and not data.get("modules"):
+    # If the query is code-related but no valid entities were found, terminate with an error.
+    if data.get("classification") == "code-related" and not data.get("functions") and not data.get("modules"):
         logger.error("Invalid query: The query does not reference any known function or class names from our context.") 
         return {}
     
     return data
 
-def fallback_reformulated_queries(extracted_data: dict) -> dict:
-    """
-    Fallback method to generate reformulated queries using simple templates based on heuristic data.
-    
-    Args:
-        extracted_data (dict): Contains heuristic data (functions, modules).
-    
-    Returns:
-        dict: A dictionary with template-based reformulated queries.
-    """
-    modules = extracted_data.get("modules", ["ModuleA", "ModuleB"])
-    functions = extracted_data.get("functions", ["processData()"])
-    graphdb_query = f"Find all function calls and dependencies between modules: {', '.join(modules)}."
-    metadata_query = f"Retrieve file paths, API references, and documentation for modules: {', '.join(modules)}."
-    faiss_query = f"Search for similar embeddings to functions: {', '.join(functions)}."
-    documentation_query = f"Find all documentation entries mentioning modules: {', '.join(modules)}."
-    return {
-        "graphdb_query": graphdb_query,
-        "metadata_query": metadata_query,
-        "faiss_query": faiss_query,
-        "documentation_query": documentation_query
-    }
-
-def get_reformulated_queries(query: str, extracted_data: dict) -> dict:
-    """
-    Uses the Gemini API to generate backend-specific reformulated queries based on the extracted data.
-    Falls back to a template-based approach if the API call fails or the output is invalid.
-    """
-    reformulation_prompt = (
-        f"Using the following extracted information:\n"
-        f"Functions: {extracted_data.get('functions', [])}\n"
-        f"Modules: {extracted_data.get('modules', [])}\n"
-        f"Classification: {extracted_data.get('classification')}\n"
-        "Generate a JSON output with the following keys:\n"
-        "- graphdb_query: A query to retrieve relationships and dependencies in the code.\n"
-        "- metadata_query: A query to retrieve metadata and documentation references.\n"
-        "- faiss_query: A query to search for similar code patterns or embeddings.\n"
-        "- documentation_query: A query to retrieve documentation entries.\n"
-        "Ensure the queries are tailored to the context of a codebase. "
-        "Respond in valid JSON format with double quotes for keys and values.\n"
-        f"Original Query: \"{query}\"."
-    )
-    response = call_gemini_api(reformulation_prompt)
-    if response is None:
-        logger.warning("Gemini API call failed for reformulation; using fallback templates.")
-        return fallback_reformulated_queries(extracted_data)
-    
-    try:
-        data = json.loads(response)
-    except json.decoder.JSONDecodeError as e:
-        logger.warning("JSON decoding failed during reformulation, attempting to fix quotes: %s", e)
-        fixed_response = response.replace("'", "\"")
-        try:
-            data = json.loads(fixed_response)
-        except Exception as e2:
-            logger.error("Error processing Gemini reformulation response after fixing quotes: %s", e2)
-            return fallback_reformulated_queries(extracted_data)
-    
-    if not all(key in data for key in ["graphdb_query", "metadata_query", "faiss_query", "documentation_query"]):
-        logger.error("Missing keys in Gemini reformulation response. Response was: %s", data)
-        return fallback_reformulated_queries(extracted_data)
-    
-    return data
-
-def fallback_reformulated_queries(extracted_data: dict) -> dict:
-    """
-    Fallback method to generate reformulated queries using simple templates based on heuristic data.
-    
-    Args:
-        extracted_data (dict): Contains heuristic data (functions, modules).
-    Returns:
-        dict: A dictionary with template-based reformulated queries.
-    """
-    modules = extracted_data.get("modules", ["ModuleA", "ModuleB"])
-    functions = extracted_data.get("functions", ["processData()"])
-    graphdb_query = f"Find all function calls and dependencies between modules: {', '.join(modules)}."
-    metadata_query = f"Retrieve file paths, API references, and documentation for modules: {', '.join(modules)}."
-    faiss_query = f"Search for similar embeddings to functions: {', '.join(functions)}."
-    documentation_query = f"Find all documentation entries mentioning modules: {', '.join(modules)}."
-    return {
-        "graphdb_query": graphdb_query,
-        "metadata_query": metadata_query,
-        "faiss_query": faiss_query,
-        "documentation_query": documentation_query
-    }
-
 def build_faiss_query_from_graph(node_name):
     deps = get_dependencies(node_name)
     query_parts = [f"Node: {node_name}"]
-
     if deps:
         query_parts.append(f"Depends on: {', '.join(deps)}")
 
     return ". ".join(query_parts)
+
+def get_context_for_code(nodes):
+    if not nodes:
+        print("No relevant functions or modules found.")
+        return
+
+    print(f"Nodes identified: {nodes}")
+    faiss_queries = {node: build_faiss_query_from_graph(node) for node in nodes}
+    context_parts = []
+
+    for node, query_code in faiss_queries.items():
+        embedding = code_indexer.encode_code(query_code)
+        indices, _ = faiss_manager.search(embedding)
+        if indices is None or len(indices) == 0:
+            continue
+        codefile = fetch_code_file_by_embedding_id(indices[0])
+        context_parts.append(f"\nNode: {node}\n\nRaw Code:\n{codefile.raw_code}\n")
+    print(codefile.file_path)
+    if not context_parts:
+        print("No code context retrieved.")
+        return
+
+    return context_parts
+
+def get_context_for_document(query):
+    embedding = doc_indexer.encode_document(query)
+    indices, _ = faiss_manager.search(embedding)
+    if indices is None or len(indices) == 0:
+        print("No index. Embedding not found")
+        return
+    docfile = fetch_document_by_embedding_id(indices[0])
+    return docfile.raw_content
+
+def extract_documentation_related_response(query):
+    document_context = get_context_for_document(query)    
+
+    llm_context = (
+        f"The user asked the following documentation-related query:\n\"{query}\"\n\n"
+        "Below is the relevant documentation extracted from the codebase:\n"
+        f"{'-'*80}\n" +
+        "\n".join(document_context) +
+        f"\n{'-'*80}\n"
+        "### Instructions:\n"
+        "- Use the documentation above to answer the query.\n"
+        "- Be concise and accurate.\n"
+        "- If the documentation does not directly address the query, say so explicitly.\n"
+    )
+
+    response = call_gemini_api(llm_context)
+    return response
+
+def extract_code_related_response(nodes, query):
+    code_context = get_context_for_code2(nodes)
+    document_context = get_context_for_document(query)  
+
+    llm_context = (
+        f"The user has asked the following query related to code entities: {query}\n\n"
+        f"## Code Entities Mentioned ({len(nodes)} total): {nodes}\n"
+        f"Below is the raw code relevant to these nodes:\n"
+        f"{'-'*80}\n" +
+        "\n".join(code_context) +
+        f"\n{'-'*80}\n"
+        "In addition to the code, here is the documentation that might relate to the user's question.\n"
+        "Use this documentation **only if** it helps clarify how the mentioned code entities work, are used, or are described in the broader system:\n"
+        f"{'-'*80}\n" +
+        "\n".join(document_context) +
+        f"\n{'-'*80}\n"
+        "### Instructions:\n"
+        "- Focus primarily on answering based on the code logic, structure, and functionality.\n"
+        "- Use the documentation only if it enhances the answer about the code entities.\n"
+        "- If the documentation does not clearly relate to the mentioned code entities, **ignore it**.\n"
+        "- Provide a clear and technically grounded explanation.\n"
+    )
+
+    response = call_gemini_api(llm_context)
+    return response
 
 def process_query(query: str) -> None:
     """
@@ -278,44 +277,13 @@ def process_query(query: str) -> None:
     if classification == "code-related":
         print("Classification: Code-related")
         nodes = list(filter(entity_exists, extracted_data.get("functions", []) + extracted_data.get("modules", [])))
-        if not nodes:
-            print("No relevant functions or modules found.")
-            return
-
-        print(f"Nodes identified: {nodes}")
-        faiss_queries = {node: build_faiss_query_from_graph(node) for node in nodes}
-
-
-        context_parts = []
-
-        for node, query_code in faiss_queries.items():
-            embedding = code_indexer.encode_code(query_code)
-            indices, _ = faiss_manager.search(embedding)
-            if indices is None or len(indices) == 0:
-                continue
-            codefile = fetch_code_file_by_embedding_id(indices[0])
-            context_parts.append(f"\nNode: {node}\n\nRaw Code:\n{codefile.raw_code}\n")
-
-        if not context_parts:
-            print("No code context retrieved.")
-            return
-
-        llm_context = (
-            f"Context: The user asked about {len(nodes)} nodes. Below is the relevant raw code:\n" +
-            "\n".join(context_parts) +
-            "\n\nBased on this context, answer the user's question accurately."
-            f"\nUser question: {query}"
-        )
-
-        response = call_gemini_api(llm_context)
+        response = extract_code_related_response(nodes, query)
         print("Final Response:\n", response)
 
     elif classification == "documentation-related":
-        print("Classification: Documentation-related (FAISS + Metadata DB placeholder)")
-
-    elif classification == "hybrid":
-        print("Classification: Hybrid (FAISS + GraphDB + Metadata DB placeholder)")
-
+        print("Classification: Documentation-related")
+        response = extract_documentation_related_response(query)
+        print("Final Response:\n", response)
     else:
         print("Invalid classification")
 

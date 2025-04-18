@@ -23,7 +23,9 @@ save_graph(graph)
 logger.info("Created initial NetworkX graph.")
 
 # Initialize indexers and ingestion
-repo_path = "data/PyGithub"
+# repo_path = "data/PyGithub"
+repo_path = "data/redditwarp"
+
 ingestion = IngestionManager(repo_path)
 
 # Run the indexing
