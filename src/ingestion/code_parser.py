@@ -96,7 +96,7 @@ def parse_code_file(file_path):
         return None
 
     codefile = CodeFile(
-        embedding_id=-1,
+        embedding_ids=None,
         file_path=file_path,
         entities=entities,
         raw_code=raw_code,
