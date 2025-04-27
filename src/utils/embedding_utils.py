@@ -62,3 +62,18 @@ def search_similar_vectors(query_embedding, k=5):
     
     distances, indices = index.search(query_embedding, k)
     return indices[0], distances[0]
+
+class FAISSManager:
+    def __init__(self):
+        self.index = _get_faiss_index()
+        
+    def add_embeddings(self, embeddings):
+        if not isinstance(embeddings, np.ndarray):
+            raise ValueError("Embeddings must be a numpy array.")
+        self.index.add(embeddings)
+        save_faiss_index(self.index)
+        
+    def search(self, query_embedding, k=5):
+        query_embedding = np.expand_dims(query_embedding, axis=0)
+        distances, indices = self.index.search(query_embedding, k)
+        return indices[0], distances[0]
